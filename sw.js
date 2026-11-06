@@ -1,5 +1,5 @@
 // offline support for the booth iPad: network-first for the page, cache fallback
-const C = 'hb-report-v1';
+const C = 'hb-report-v2';
 self.addEventListener('install', e => { e.waitUntil(caches.open(C).then(c => c.addAll(['./', './index.html', './manifest.webmanifest', './icon-512.png']))); self.skipWaiting(); });
 self.addEventListener('activate', e => e.waitUntil(self.clients.claim()));
 self.addEventListener('fetch', e => {

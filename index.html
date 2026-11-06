@@ -622,7 +622,7 @@ function fresh() {
   return {
     agent: `${pick(A)} ${pick(B)}${p2(Math.floor(Math.random() * 99) + 1)}`,
     file: `HB-${String(d.getFullYear()).slice(2)}-${Math.floor(Math.random() * 9000) + 1000}`,
-    started: Date.now(), verified: false, facing: 'user',
+    started: Date.now(), verified: false, photo: '', facing: 'user',
     gender: null, age: null, a: {}, q3other: '', q5: null, q8: null, q9: '', zones: {}, q11: '', sent: false,
   };
 }
@@ -774,6 +774,8 @@ function capture(scr) {
   if (S.facing === 'user') { x.translate(c.width, 0); x.scale(-1, 1); }
   x.drawImage(v, (w - tw) / 2, (h - th) / 2, tw, th, 0, 0, c.width, c.height);
   const url = c.toDataURL('image/jpeg', .85);
+  const sm = document.createElement('canvas'); sm.width = 360; sm.height = 450; sm.getContext('2d').drawImage(c, 0, 0, 360, 450);
+  S.photo = sm.toDataURL('image/jpeg', .72);
   stopCam();
   const f = document.createElement('div'); f.className = 'flash'; document.body.appendChild(f); setTimeout(() => f.remove(), 700);
   beep(1568, .12, .08); buzz(60);
@@ -875,7 +877,8 @@ BUILD.profile = () => screen(`
         <div class="notice"><h4>보고서 유의사항 <span>NOTICE</span></h4>
           <p>· 수집 정보는 성별·나이뿐이며, 이름·연락처는 받지 않아요.</p>
           <p>· 모든 보고는 기밀로 유지되고 익명 통계로만 쓰여요.</p>
-          <p>· 보내주신 보고서는 앞으로 더 나은 프로젝트를 만드는 데 활용됩니다.</p></div>
+          <p>· 보내주신 보고서는 앞으로 더 나은 프로젝트를 만드는 데 활용됩니다.</p>
+          <p>· 부스 인증샷은 전시 기록용으로 본사에만 보관되며 외부에 공개되지 않아요.</p></div>
       </div>
     </div>
   </div></main>
@@ -1270,7 +1273,7 @@ function confetti(cv) {
 }
 
 // ====== DATA ======
-const HEAD = ['제출시각', '보고서번호', '요원코드명', '사진인증', '기기', '성별', '나이', 'Q1 기초 스킨케어', 'Q2 색조 제품', 'Q3 정보 경로', 'Q3 기타', 'Q4 게임 습관',
+const HEAD = ['제출시각', '보고서번호', '요원코드명', '사진인증', '사진', '사진 파일', '기기', '성별', '나이', 'Q1 기초 스킨케어', 'Q2 색조 제품', 'Q3 정보 경로', 'Q3 기타', 'Q4 게임 습관',
   'Q5 성분·정보 흥미/이해도', 'Q6 구매 의향 변화', 'Q7 브랜드 의견', 'Q8 참여형 광고 경험', 'Q9 이유', 'Q10 인상 깊은 존',
   'Q10 인게임 DP존 이유', 'Q10 게임 플레이존 이유', 'Q10 브랜드존 이유', 'Q11 방명록', '소요시간(초)'];
 function record() {
@@ -1280,7 +1283,7 @@ function record() {
   const d = new Date();
   return {
     '제출시각': `${d.getFullYear()}-${p2(d.getMonth() + 1)}-${p2(d.getDate())} ${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`,
-    '보고서번호': S.file, '요원코드명': S.agent, '사진인증': S.verified ? 'O' : 'X', '기기': `${dev} (${innerWidth}×${innerHeight})`,
+    '보고서번호': S.file, '요원코드명': S.agent, '사진인증': S.verified ? 'O' : 'X', '사진': S.photo || '', '기기': `${dev} (${innerWidth}×${innerHeight})`,
     '성별': S.gender || '', '나이': S.age ? (S.age >= 60 ? '60+' : S.age) : '',
     'Q1 기초 스킨케어': pick('q1'), 'Q2 색조 제품': pick('q2'), 'Q3 정보 경로': pick('q3'), 'Q3 기타': (S.a.q3 || []).includes(3) ? S.q3other : '',
     'Q4 게임 습관': pick('q4'), 'Q5 성분·정보 흥미/이해도': S.q5 ? `${S.q5} · ${LIKERT[S.q5 - 1]}` : '',
@@ -1290,12 +1293,16 @@ function record() {
     'Q11 방명록': S.q11.trim(), '소요시간(초)': Math.round((Date.now() - S.started) / 1000),
   };
 }
-const LS = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} } };
+const LS = { get(k, d) { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } } };
 function submit() {
   if (S.sent) return; S.sent = true;
   const r = record();
-  const all = LS.get('hb_all', []); all.push(r); LS.set('hb_all', all);
-  if (ENDPOINT) { const q = LS.get('hb_queue', []); q.push(r); LS.set('hb_queue', q); flush(); }
+  const all = LS.get('hb_all', []); const lite = Object.assign({}, r); delete lite['사진']; all.push(lite); LS.set('hb_all', all);
+  if (ENDPOINT) {
+    const q = LS.get('hb_queue', []); q.push(r);
+    if (LS.set('hb_queue', q)) flush();
+    else fetch(ENDPOINT, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(r) }).catch(() => {});
+  }
 }
 let flushing = false;
 async function flush() {
